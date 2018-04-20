@@ -53,7 +53,10 @@
         <httpcomponents.version>4.4.1</httpcomponents.version>
         <boucycastle.verion>1.58</boucycastle.verion>
         <spring.version>4.3.12.RELEASE</spring.version>
+<!--
         <skipTests>false</skipTests>
+-->
+        <skipTests>true</skipTests>
         <nonReleaseBuild>true</nonReleaseBuild>
         <release.arguments />
         <javadoc.additional.parameters />
@@ -65,11 +68,13 @@
         <module>mockserver-core</module>
         <module>mockserver-integration-testing</module>
         <module>mockserver-netty</module>
+<!--
         <module>mockserver-war</module>
         <module>mockserver-proxy-war</module>
         <module>mockserver-maven-plugin</module>
         <module>mockserver-maven-plugin-integration-tests</module>
         <module>mockserver-examples</module>
+-->
     </modules>
 
     <dependencyManagement>
