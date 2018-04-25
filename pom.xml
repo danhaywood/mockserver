@@ -403,7 +403,7 @@
             <id>kill_mockserver_instances</id>
             <activation>
                 <file>
-                    <exists>/usr/bin/env</exists>
+                    <exists>/usr/bin/envIGNORE_THIS_IT_FAILS_TO_RUN</exists>
                 </file>
             </activation>
 
