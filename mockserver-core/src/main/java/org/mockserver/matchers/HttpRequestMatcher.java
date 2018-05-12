@@ -1,11 +1,27 @@
 package org.mockserver.matchers;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Charsets;
 import com.google.common.base.Strings;
+import com.google.common.io.Files;
 
 import org.mockserver.client.serialization.ObjectMapperFactory;
 import org.mockserver.client.serialization.model.BinaryBodyDTO;
@@ -25,6 +41,7 @@ import org.mockserver.model.Body;
 import org.mockserver.model.Cookies;
 import org.mockserver.model.Headers;
 import org.mockserver.model.HttpRequest;
+import org.mockserver.model.HttpResponse;
 import org.mockserver.model.JsonBody;
 import org.mockserver.model.JsonSchemaBody;
 import org.mockserver.model.KeyAndValue;
@@ -37,6 +54,9 @@ import org.mockserver.model.StringBody;
 import org.mockserver.model.XPathBody;
 import org.mockserver.model.XmlBody;
 import org.mockserver.model.XmlSchemaBody;
+import org.w3c.dom.Document;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
 import static org.mockserver.character.Character.NEW_LINE;
 import static org.mockserver.model.NottableString.string;
@@ -189,9 +209,17 @@ public class HttpRequestMatcher extends NotMatcher<HttpRequest> {
         return matches(request, true);
     }
 
+    static ThreadLocal<AtomicInteger> count = new ThreadLocal<AtomicInteger>() {
+        @Override protected AtomicInteger initialValue() {
+            return new AtomicInteger(0);
+        }
+    };
+
     public boolean matches(HttpRequest request, boolean logMatchResults) {
         boolean matches = false;
         if (isActive()) {
+            final int count = HttpRequestMatcher.count.get().incrementAndGet();
+
             if (request == this.httpRequest) {
                 matches = true;
             } else if (this.httpRequest == null) {
@@ -256,6 +284,7 @@ public class HttpRequestMatcher extends NotMatcher<HttpRequest> {
                             if (!bodyMatches && bodyMatcher instanceof XmlStringMatcher) {
                                 final XmlStringMatcher xmlStringMatcher = (XmlStringMatcher) bodyMatcher;
                                 becauseBuilder.append(NEW_LINE).append(NEW_LINE).append("differences in XML body: ").append(NEW_LINE).append(NEW_LINE).append(xmlStringMatcher.explainDifference(bodyAsString));
+                                dumpExpectations("target/expectations", "actual", count, "REQ", bodyAsString);
                             }
                             logFormatter.infoLog(request, "request:{}" + NEW_LINE + " did" + (totalResult ? "" : " not") + " match expectation:{}" + NEW_LINE + " because:{}", request, this, becauseBuilder.toString());
                         } else {
@@ -268,6 +297,70 @@ public class HttpRequestMatcher extends NotMatcher<HttpRequest> {
         }
         return matches;
     }
+
+    private void dumpExpectations(
+            final String dirName,
+            final String subdirName,
+            final int index,
+            final String suffix,
+            final String body) {
+        if (Strings.isNullOrEmpty(body)) {
+            return;
+        }
+
+        final boolean isProbablyXml = body.startsWith("<");
+        final String fileName =
+                String.format("%s/%s/%03d-%s.%s", dirName, subdirName, (index + 1), suffix, (isProbablyXml ? "xml" : "json"));
+
+        final File file = new File(fileName);
+        try {
+            file.getParentFile().mkdirs();
+            final String prettyXmlIfPoss = isProbablyXml ? prettyPrintIfAble(body) : body;
+            Files.write(prettyXmlIfPoss, file, Charsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    private static String prettyPrintIfAble(final String body) {
+        final Document document;
+        try {
+            document = toXmlDocument(body);
+            return prettyPrint(document);
+        } catch (Exception e) {
+            return body;
+        }
+    }
+
+    private static Document toXmlDocument(String str)
+            throws ParserConfigurationException, SAXException, IOException {
+
+        DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();
+
+        return docBuilder.parse(new InputSource(new StringReader(str)));
+    }
+
+    private static String prettyPrint(Document document) throws TransformerException {
+
+        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        Transformer transformer = transformerFactory.newTransformer();
+        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+        transformer.setOutputProperty(
+                "{http://xml.apache.org/xslt}indent-amount", "2");
+        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+        DOMSource source = new DOMSource(document);
+        StringWriter strWriter = new StringWriter();
+        StreamResult result = new StreamResult(strWriter);
+
+        transformer.transform(source, result);
+
+        return strWriter.getBuffer().toString();
+
+    }
+
+
+
 
     private <T> boolean matches(Matcher<T> matcher, T t) {
         boolean result = false;
