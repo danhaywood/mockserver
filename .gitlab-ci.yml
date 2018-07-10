@@ -1,0 +1,30 @@
+#
+# requires the following gitlab secret variables
+#
+# - NEXUS_USERNAME
+# - NEXUS_PASSWORD
+# - NEXUS_REPO_URL
+#
+
+image: maven:3.5.3-jdk-8
+
+before_script:
+  - export BASELINE=0.0.20110304
+  - export REVISION=$BASELINE.$(date +%Y%m%d)-$(date +%H%M)-$(echo $CI_COMMIT_SHA | cut -c1-8)
+
+stages:
+  - build-package-push
+
+build-package-push:
+  stage: build-package-push
+  script:
+    - echo "REVISION=$REVISION"
+    - >
+      mvn -s .m2/settings.xml \
+          -DskipTests \
+          --batch-mode \
+          clean deploy \
+          -Drevision=$REVISION \
+          -Dnexus-deploy \
+          -Dnexus-deploy.repositoryUrl=$NEXUS_REPO_URL \
+          $CORE_ADDITIONAL_OPTS

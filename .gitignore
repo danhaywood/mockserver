@@ -94,3 +94,5 @@ mockserver-war/tomcat/
 mockserver-war/tomcat_mockserver/
 
 pom.xml.versionsBackup
+
+.flattened-pom.xml
