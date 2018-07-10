@@ -9,7 +9,7 @@
 image: maven:3.5.3-jdk-8
 
 before_script:
-  - export BASELINE=0.0.20110304
+  - export BASELINE=5.3.1-incode-462
   - export REVISION=$BASELINE.$(date +%Y%m%d)-$(date +%H%M)-$(echo $CI_COMMIT_SHA | cut -c1-8)
 
 stages:
